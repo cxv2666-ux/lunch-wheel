@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>今天吃什麼？決策轉盤</title>
+<style>
+  :root{
+    --bg:#fff7ec; --card:#ffffff; --ink:#3b2a20; --muted:#8a7565;
+    --accent:#ff7a3d; --accent2:#ffb703; --line:#f0e1cf; --danger:#e5484d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5}
+  header{text-align:center;padding:28px 16px 8px}
+  header h1{margin:0;font-size:1.9rem}
+  header p{margin:6px 0 0;color:var(--muted)}
+  main{max-width:1000px;margin:0 auto;padding:16px;display:grid;gap:20px;
+    grid-template-columns:1fr 1fr}
+  @media(max-width:800px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;
+    box-shadow:0 4px 14px rgba(120,70,20,.06)}
+  .card h2{margin:0 0 12px;font-size:1.1rem}
+  .wheel-wrap{position:relative;width:100%;max-width:380px;margin:0 auto}
+  canvas{width:100%;height:auto;display:block}
+  .pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;
+    border-top:28px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+  .spin-btn{display:block;margin:16px auto 0;padding:12px 40px;font-size:1.1rem;font-weight:700;
+    color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;
+    border-radius:999px;cursor:pointer;box-shadow:0 4px 10px rgba(255,122,61,.4)}
+  .spin-btn:disabled{opacity:.55;cursor:not-allowed}
+  .result{margin-top:14px;text-align:center;font-size:1.3rem;font-weight:700;min-height:2.2em}
+  .result small{display:block;font-size:.85rem;font-weight:400;color:var(--muted)}
+  .msg{text-align:center;color:var(--danger);min-height:1.4em;font-size:.9rem}
+  label.row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:.95rem}
+  input[type=range]{flex:1;accent-color:var(--accent)}
+  input[type=text],input[type=number]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;
+    font-size:.95rem;min-width:0;background:#fffdf9}
+  .add-form{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:6px;margin-bottom:12px}
+  @media(max-width:520px){.add-form{grid-template-columns:1fr 1fr}}
+  button.small{padding:8px 12px;border:none;border-radius:8px;background:var(--accent);color:#fff;
+    cursor:pointer;font-size:.9rem}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chip{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:#fffdf9;
+    cursor:pointer;font-size:.85rem}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  ul{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto}
+  li.item{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dashed var(--line);font-size:.92rem}
+  li.item .name{flex:1}
+  li.item .meta{color:var(--muted);font-size:.8rem}
+  li.item.off{opacity:.4}
+  li.item button{border:none;background:none;color:var(--danger);cursor:pointer;font-size:1rem}
+  .full{grid-column:1/-1}
+  .history li{padding:5px 2px;border-bottom:1px dashed var(--line);font-size:.9rem;display:flex;justify-content:space-between}
+  .history .t{color:var(--muted);font-size:.8rem}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .pop{animation:pop .5s ease}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🍜 今天吃什麼？決策轉盤</h1>
+  <p>選擇困難症救星：設定條件、按下轉盤，讓命運幫你決定。</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>🎡 轉盤</h2>
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="760" height="760"></canvas>
+    </div>
+    <button class="spin-btn" id="spinBtn">開始轉！</button>
+    <div class="msg" id="msg"></div>
+    <div class="result" id="result">按下按鈕看看今天吃什麼</div>
+  </section>
+
+  <section class="card">
+    <h2>⚙️ 篩選條件</h2>
+    <div class="chips" id="chips"></div>
+    <label class="row">預算上限：<b id="priceVal">300</b> 元
+      <input type="range" id="priceRange" min="30" max="500" step="10" value="300">
+    </label>
+    <label class="row">
+      <input type="checkbox" id="noRepeat"> 避免連續抽到上一次的結果
+    </label>
+    <div class="toolbar">
+      <button class="small ghost" id="resetBtn">還原預設選項</button>
+      <button class="small ghost" id="clearHist">清除紀錄</button>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>🍱 選項清單（可新增 / 刪除 / 暫時停用）</h2>
+    <form class="add-form" id="addForm">
+      <input type="text" id="newName" placeholder="店名或餐點" maxlength="12" required>
+      <input type="number" id="newPrice" placeholder="價格" min="0" max="9999" required>
+      <input type="text" id="newTag" placeholder="分類（如：飯類）" maxlength="6" required>
+      <button class="small" type="submit">新增</button>
+    </form>
+    <ul id="list"></ul>
+  </section>
+
+  <section class="card full">
+    <h2>📜 最近抽到的結果（最多 10 筆）</h2>
+    <ul class="history" id="history"></ul>
+  </section>
+</main>
+
+<script>
+(function(){
+  const DEFAULTS = [
+    {name:"雞腿便當",price:100,tag:"飯類",on:true},
+    {name:"滷肉飯",price:60,tag:"飯類",on:true},
+    {name:"咖哩飯",price:120,tag:"飯類",on:true},
+    {name:"牛肉麵",price:180,tag:"麵類",on:true},
+    {name:"水餃",price:80,tag:"麵類",on:true},
+    {name:"三明治",price:70,tag:"輕食",on:true},
+    {name:"沙拉",price:110,tag:"輕食",on:true},
+    {name:"蛋餅",price:45,tag:"輕食",on:true},
+    {name:"麥當勞",price:130,tag:"速食",on:true},
+    {name:"火鍋",price:300,tag:"鍋物",on:true}
+  ];
+  const KEY="lunchWheelV1";
+  let state = load();
+  let tagFilter = "全部";
+  let rotation = 0, spinning = false;
+  let lastResult = null;
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("wheel"), ctx = canvas.getContext("2d");
+
+  function load(){
+    try{
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if(s && Array.isArray(s.items)) return s;
+    }catch(e){}
+    return {items:JSON.parse(JSON.stringify(DEFAULTS)), history:[], maxPrice:300, noRepeat:false};
+  }
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){} }
+
+  function active(){
+    return state.items.filter(it =>
+      it.on && it.price <= state.maxPrice &&
+      (tagFilter==="全部" || it.tag===tagFilter) &&
+      !(state.noRepeat && lastResult && it.name===lastResult && countCandidatesBase()>2)
+    );
+  }
+  function countCandidatesBase(){
+    return state.items.filter(it => it.on && it.price<=state.maxPrice &&
+      (tagFilter==="全部"||it.tag===tagFilter)).length;
+  }
+
+  function drawWheel(){
+    const list = active(), n = list.length, W = canvas.width, c = W/2, r = c-8;
+    ctx.clearRect(0,0,W,W);
+    if(n===0){
+      ctx.fillStyle="#f3e6d4"; ctx.beginPath(); ctx.arc(c,c,r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#8a7565"; ctx.font="bold 36px sans-serif"; ctx.textAlign="center";
+      ctx.fillText("沒有符合的選項",c,c); return;
+    }
+    const arc = Math.PI*2/n;
+    for(let i=0;i<n;i++){
+      const a0 = rotation + i*arc;
+      ctx.beginPath(); ctx.moveTo(c,c); ctx.arc(c,c,r,a0,a0+arc); ctx.closePath();
+      ctx.fillStyle = `hsl(${(i*360/n+15)%360},80%,${i%2?72:64}%)`;
+      ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=4; ctx.stroke();
+      ctx.save(); ctx.translate(c,c); ctx.rotate(a0+arc/2);
+      ctx.fillStyle="#2b1c12"; ctx.textAlign="right"; ctx.textBaseline="middle";
+      ctx.font = `bold ${n>12?24:32}px sans-serif`;
+      ctx.fillText(list[i].name, r-24, 0);
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(c,c,34,0,Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+    ctx.strokeStyle="#f0e1cf"; ctx.lineWidth=4; ctx.stroke();
+  }
+
+  function spin(){
+    if(spinning) return;
+    const list = active();
+    $("msg").textContent="";
+    if(list.length<2){ $("msg").textContent="至少需要 2 個符合條件的選項才能轉喔！"; return; }
+    spinning = true; $("spinBtn").disabled = true;
+    $("result").textContent="轉轉轉…";
+    const n=list.length, arc=Math.PI*2/n, idx=Math.floor(Math.random()*n);
+    const jitter=(Math.random()-.5)*arc*.7;
+    const target = -Math.PI/2 - (idx+.5)*arc + jitter;
+    const TAU=Math.PI*2;
+    const delta = (((target-rotation)%TAU)+TAU)%TAU + TAU*(5+Math.floor(Math.random()*3));
+    const start=rotation, dur=4200, t0=performance.now();
+    function frame(now){
+      const p=Math.min((now-t0)/dur,1), e=1-Math.pow(1-p,4);
+      rotation = start+delta*e; drawWheel();
+      if(p<1) requestAnimationFrame(frame); else finish(list[idx]);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finish(item){
+    spinning=false; $("spinBtn").disabled=false;
+    lastResult = item.name;
+    const el=$("result");
+    el.innerHTML="";
+    const b=document.createElement("div"); b.className="pop"; b.textContent="🎉 "+item.name;
+    const s=document.createElement("small"); s.textContent=item.tag+"・約 "+item.price+" 元";
+    el.append(b,s);
+    const now=new Date();
+    state.history.unshift({name:item.name,time:now.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})});
+    state.history=state.history.slice(0,10);
+    save(); renderHistory(); drawWheel();
+  }
+
+  function renderChips(){
+    const tags=["全部",...new Set(state.items.map(i=>i.tag))];
+    if(!tags.includes(tagFilter)) tagFilter="全部";
+    const box=$("chips"); box.innerHTML="";
+    tags.forEach(t=>{
+      const d=document.createElement("span");
+      d.className="chip"+(t===tagFilter?" on":""); d.textContent=t;
+      d.onclick=()=>{ if(spinning)return; tagFilter=t; refresh(); };
+      box.appendChild(d);
+    });
+  }
+  function renderList(){
+    const ul=$("list"); ul.innerHTML="";
+    state.items.forEach((it,i)=>{
+      const li=document.createElement("li"); li.className="item"+(it.on?"":" off");
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=it.on;
+      cb.onchange=()=>{ if(spinning){cb.checked=it.on;return;} it.on=cb.checked; save(); refresh(); };
+      const nm=document.createElement("span"); nm.className="name"; nm.textContent=it.name;
+      const mt=document.createElement("span"); mt.className="meta"; mt.textContent=it.tag+"・$"+it.price;
+      const del=document.createElement("button"); del.textContent="✕"; del.title="刪除";
+      del.onclick=()=>{ if(spinning)return; state.items.splice(i,1); save(); refresh(); };
+      li.append(cb,nm,mt,del); ul.appendChild(li);
+    });
+  }
+  function renderHistory(){
+    const ul=$("history"); ul.innerHTML="";
+    if(!state.history.length){ ul.innerHTML='<li class="t">還沒有紀錄，轉一次試試！</li>'; return; }
+    state.history.forEach(h=>{
+      const li=document.createElement("li");
+      const a=document.createElement("span"); a.textContent=h.name;
+      const b=document.createElement("span"); b.className="t"; b.textContent=h.time;
+      li.append(a,b); ul.appendChild(li);
+    });
+  }
+  function refresh(){ renderChips(); renderList(); drawWheel(); }
+
+  $("spinBtn").onclick=spin;
+  $("priceRange").value=state.maxPrice; $("priceVal").textContent=state.maxPrice;
+  $("priceRange").oninput=e=>{
+    if(spinning) { e.target.value=state.maxPrice; return; }
+    state.maxPrice=+e.target.value; $("priceVal").textContent=state.maxPrice; save(); drawWheel();
+  };
+  $("noRepeat").checked=state.noRepeat;
+  $("noRepeat").onchange=e=>{ state.noRepeat=e.target.checked; save(); drawWheel(); };
+  $("addForm").onsubmit=e=>{
+    e.preventDefault(); if(spinning) return;
+    const name=$("newName").value.trim(), tag=$("newTag").value.trim(), price=+$("newPrice").value;
+    if(!name||!tag||isNaN(price)) return;
+    if(state.items.length>=24){ $("msg").textContent="選項最多 24 個！"; return; }
+    state.items.push({name,price,tag,on:true});
+    e.target.reset(); save(); refresh();
+  };
+  $("resetBtn").onclick=()=>{
+    if(spinning) return;
+    state.items=JSON.parse(JSON.stringify(DEFAULTS)); tagFilter="全部"; save(); refresh();
+  };
+  $("clearHist").onclick=()=>{ state.history=[]; lastResult=null; save(); renderHistory(); };
+
+  refresh(); renderHistory();
+})();
+</script>
+</body>
+</html>
